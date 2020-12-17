@@ -1,11 +1,12 @@
 package com.mithrilmania.blocktopograph.chunk.terrain;
 
-import com.mithrilmania.blocktopograph.WorldData;
-import com.mithrilmania.blocktopograph.map.Block;
-import com.mithrilmania.blocktopograph.map.Dimension;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
+import androidx.annotation.NonNull;
 
-import org.jetbrains.annotations.NotNull;
+import com.mithrilmania.blocktopograph.WorldData;
+import com.mithrilmania.blocktopograph.block.Block;
+import com.mithrilmania.blocktopograph.block.BlockRegistry;
+import com.mithrilmania.blocktopograph.block.KnownBlockRepr;
+import com.mithrilmania.blocktopograph.map.Dimension;
 
 import java.nio.ByteBuffer;
 
@@ -19,7 +20,7 @@ public final class PreV1d2d13TerrainSubChunk extends TerrainSubChunk {
 
     private ByteBuffer mData;
 
-    PreV1d2d13TerrainSubChunk(@NotNull ByteBuffer raw, @NotNull WorldData.BlockRegistry blockRegistry) {
+    PreV1d2d13TerrainSubChunk(@NonNull ByteBuffer raw, @NonNull BlockRegistry blockRegistry) {
 
         super(blockRegistry);
 
@@ -35,19 +36,19 @@ public final class PreV1d2d13TerrainSubChunk extends TerrainSubChunk {
         mHasBlockLight = size == TERRAIN_MAX_LENGTH;
     }
 
-    @NotNull
+    @NonNull
     @Override
-    public KnownBlock getBlock(int x, int y, int z, int layer) {
-        if (mIsError) return KnownBlock.B_0_0_AIR;
+    public Block getBlock(int x, int y, int z, int layer) {
+        if (mIsError) return getAir();
         int offset = getOffset(x, y, z);
         int id = mData.get(POS_BLOCK_IDS + offset) & 0xff;
         int data = mData.get(POS_META_DATA + (offset >>> 1));
         data = (offset & 1) == 1 ? ((data >>> 4) & 0xf) : (data & 0xf);
-        return KnownBlock.getBestBlock(id, data);
+        return wrapKnownBlock(KnownBlockRepr.getBestBlock(id, data));
     }
 
     @Override
-    public void setBlock(int x, int y, int z, int layer, @NotNull Block block) {
+    public void setBlock(int x, int y, int z, int layer, @NonNull Block block) {
         // TODO implement setBlock for pre v1.2.13 subChunk.
     }
 

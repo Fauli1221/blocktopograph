@@ -20,12 +20,12 @@ import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.Fragment;
 
 import com.litl.leveldb.DB;
+import com.mithrilmania.blocktopograph.block.ListingBlock;
 import com.mithrilmania.blocktopograph.databinding.ActivityCreateWorldBinding;
 import com.mithrilmania.blocktopograph.flat.EditFlatFragment;
 import com.mithrilmania.blocktopograph.flat.FlatLayers;
 import com.mithrilmania.blocktopograph.flat.Layer;
 import com.mithrilmania.blocktopograph.map.Biome;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
 import com.mithrilmania.blocktopograph.nbt.InventoryHolder;
 import com.mithrilmania.blocktopograph.nbt.ItemTag;
 import com.mithrilmania.blocktopograph.nbt.Keys;
@@ -43,8 +43,6 @@ import com.mithrilmania.blocktopograph.util.McUtil;
 import com.mithrilmania.blocktopograph.util.UiUtil;
 import com.tomergoldst.tooltips.ToolTip;
 import com.tomergoldst.tooltips.ToolTipsManager;
-
-import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -77,6 +75,7 @@ public final class CreateWorldActivity extends AppCompatActivity {
     }
 
     public void onClickPositiveButton(View view) {
+        //Toast.makeText(this, "fuck", Toast.LENGTH_SHORT).show();
         new CreateWorldTask(this).execute();
     }
 
@@ -94,7 +93,7 @@ public final class CreateWorldActivity extends AppCompatActivity {
         startActivityForResult(new Intent(this, BiomeSelectDialog.class), REQUEST_CODE_PICK_BIOME);
     }
 
-    private void setBiomeToView(@NotNull Biome biome) {
+    private void setBiomeToView(@NonNull Biome biome) {
         UiUtil.blendBlockColor(mBinding.biomeView.root, biome);
         mBinding.biomeView.setBiome(biome);
     }
@@ -189,7 +188,8 @@ public final class CreateWorldActivity extends AppCompatActivity {
                 int cnt = 0;
                 do {
                     wDir = new File(worldsDir, dirName + '_' + cnt);
-                } while (wDir.exists());
+                    cnt++;
+                } while (wDir.exists() && cnt < 1000);
             }
             if (!wDir.mkdir()) return false;
 
@@ -217,10 +217,10 @@ public final class CreateWorldActivity extends AppCompatActivity {
                 if (lsize != 4) mIsVanillaFlat = false;
                 else {
                     Layer ltest = layers.get(0);
-                    mIsVanillaFlat = ltest.block == KnownBlock.B_31_2_TALLGRASS_GRASS && ltest.amount == 1
-                            && (ltest = layers.get(1)).block == KnownBlock.B_2_0_GRASS && ltest.amount == 1
-                            && (ltest = layers.get(2)).block == KnownBlock.B_3_0_DIRT && ltest.amount == 29
-                            && (ltest = layers.get(3)).block == KnownBlock.B_7_0_BEDROCK && ltest.amount == 1;
+                    mIsVanillaFlat = ltest.block == ListingBlock.B_31_TALLGRASS && ltest.amount == 1
+                            && (ltest = layers.get(1)).block == ListingBlock.B_2_GRASS && ltest.amount == 1
+                            && (ltest = layers.get(2)).block == ListingBlock.B_3_DIRT && ltest.amount == 29
+                            && (ltest = layers.get(3)).block == ListingBlock.B_7_BEDROCK && ltest.amount == 1;
                 }
                 Layer[] alayers = new Layer[lsize < 3 ? 3 : lsize];
                 for (int i = 0; i < lsize; i++) {
@@ -310,11 +310,11 @@ public final class CreateWorldActivity extends AppCompatActivity {
                     }
                     for (int i = 0; i < lines; i++) {
                         Layer layer = layers.get(i);
-                        int maxlen = 11 - Integer.toString(layer.amount).length();
+                        int maxlen = 12 - Integer.toString(layer.amount).length();
                         String nam;
                         if (maxlen <= 0) nam = "";
                         else {
-                            String namo = layer.block.str;
+                            String namo = layer.block.getName();
                             if (namo.length() >= maxlen) nam = namo.substring(0, maxlen);
                             else nam = namo;
                         }

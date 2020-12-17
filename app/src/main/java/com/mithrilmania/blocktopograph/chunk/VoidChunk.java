@@ -1,11 +1,11 @@
 package com.mithrilmania.blocktopograph.chunk;
 
-import com.mithrilmania.blocktopograph.WorldData;
-import com.mithrilmania.blocktopograph.map.Block;
-import com.mithrilmania.blocktopograph.map.Dimension;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
+import androidx.annotation.NonNull;
 
-import org.jetbrains.annotations.NotNull;
+import com.mithrilmania.blocktopograph.WorldData;
+import com.mithrilmania.blocktopograph.block.Block;
+import com.mithrilmania.blocktopograph.map.Dimension;
+
 
 public final class VoidChunk extends Chunk {
 
@@ -48,26 +48,20 @@ public final class VoidChunk extends Chunk {
         return 0;
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Block getBlock(int x, int y, int z) {
         return getBlock(x, y, z, 0);
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Block getBlock(int x, int y, int z, int layer) {
-        return getKnownBlock(x, y, z, layer);
-    }
-
-    @NotNull
-    @Override
-    public KnownBlock getKnownBlock(int x, int y, int z, int layer) {
-        return KnownBlock.B_0_0_AIR;
+        return getAir();
     }
 
     @Override
-    public void setBlock(int x, int y, int z, int layer, @NotNull Block block) {
+    public void setBlock(int x, int y, int z, int layer, @NonNull Block block) {
     }
 
     @Override

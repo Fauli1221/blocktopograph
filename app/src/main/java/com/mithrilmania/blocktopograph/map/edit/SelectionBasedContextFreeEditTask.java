@@ -6,37 +6,44 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+
 import com.mithrilmania.blocktopograph.R;
+import com.mithrilmania.blocktopograph.block.BlockRegistry;
+import com.mithrilmania.blocktopograph.block.KnownBlockRepr;
+import com.mithrilmania.blocktopograph.block.ListingBlock;
 import com.mithrilmania.blocktopograph.map.Biome;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
 import com.mithrilmania.blocktopograph.map.MapFragment;
 import com.mithrilmania.blocktopograph.util.UiUtil;
-
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
 
-import androidx.appcompat.app.AlertDialog;
-
 public class SelectionBasedContextFreeEditTask extends
         AsyncTask<EditTarget, ChunkBasedEditResult, EditResultCode> {
 
-    @NotNull
+    @NonNull
     private final EditFunction mFunction;
 
     @Nullable
     private Bundle mArgs;
 
-    @NotNull
+    @NonNull
     private final WeakReference<MapFragment> mOwner;
+
+    @NonNull
+    private final BlockRegistry registry;
+
     private AlertDialog mWaitDialog;
 
     public SelectionBasedContextFreeEditTask(
-            @NotNull EditFunction func, @Nullable Bundle args, @NotNull MapFragment owner) {
+            @NonNull EditFunction func, @Nullable Bundle args, @NonNull MapFragment owner,
+            @NonNull BlockRegistry registry) {
         mFunction = func;
         mArgs = args;
+        this.registry = registry;
         mOwner = new WeakReference<>(owner);
     }
 
@@ -60,8 +67,8 @@ public class SelectionBasedContextFreeEditTask extends
                 SnrConfig cfg = new SnrConfig();
                 cfg.searchMode = 2;
                 cfg.placeMode = 1;
-                cfg.searchBlockMain = KnownBlock.B_50_0_TORCH;
-                cfg.placeBlockMain = KnownBlock.B_20_0_GLASS;
+                cfg.searchBlockMain = new SnrConfig.SearchConditionBlock(ListingBlock.B_50_TORCH);
+                cfg.placeBlockMain = registry.createBlock(KnownBlockRepr.B_20_0_GLASS);
                 cfg.ignoreSubId = true;
                 return doSnr(cfg, editTargets);
             }
@@ -81,11 +88,10 @@ public class SelectionBasedContextFreeEditTask extends
                 return doChBiome(serFrom instanceof Biome ? (Biome) serFrom : null, (Biome) serTo, editTargets);
             }
         }
-
         return null;
     }
 
-    private EditResultCode doSnr(SnrConfig cfg, @NotNull EditTarget... editTargets) {
+    private EditResultCode doSnr(SnrConfig cfg, @NonNull EditTarget... editTargets) {
         SnrEdit edit = new SnrEdit(cfg);
         for (EditTarget editTarget : editTargets) {
             editTarget.setMaxError(Integer.MAX_VALUE);
@@ -94,7 +100,7 @@ public class SelectionBasedContextFreeEditTask extends
         return EditResultCode.SUCCESS;
     }
 
-    private EditResultCode doDchunk(@NotNull EditTarget... editTargets) {
+    private EditResultCode doDchunk(@NonNull EditTarget... editTargets) {
         DchunkEdit edit = new DchunkEdit();
         for (EditTarget editTarget : editTargets) {
             editTarget.setMaxError(Integer.MAX_VALUE);
@@ -103,8 +109,8 @@ public class SelectionBasedContextFreeEditTask extends
         return EditResultCode.SUCCESS;
     }
 
-    private EditResultCode doChBiome(@Nullable Biome from, @NotNull Biome to,
-                                     @NotNull EditTarget... editTargets) {
+    private EditResultCode doChBiome(@Nullable Biome from, @NonNull Biome to,
+                                     @NonNull EditTarget... editTargets) {
         ChBiomeEdit edit = new ChBiomeEdit(from, to);
         for (EditTarget editTarget : editTargets) {
             editTarget.setMaxError(Integer.MAX_VALUE);
@@ -122,7 +128,7 @@ public class SelectionBasedContextFreeEditTask extends
     }
 
     @Override
-    protected void onPostExecute(EditResultCode editResultCode) {
+    protected void onPostExecute(@Nullable EditResultCode editResultCode) {
         if (mWaitDialog != null) {
             mWaitDialog.dismiss();
         }
@@ -130,11 +136,14 @@ public class SelectionBasedContextFreeEditTask extends
         Activity activity;
         if (owner != null && (activity = owner.getActivity()) != null) {
             owner.world.setHaveBackgroundJob(false);
+            if (editResultCode == null)
+                return;
             switch (editResultCode) {
                 case SUCCESS:
                     Toast.makeText(activity, R.string.general_done, Toast.LENGTH_SHORT).show();
                     owner.refreshAfterEdit();
                     break;
+                case DB_ERROR:
                 default:
                     Toast.makeText(activity, R.string.general_failed, Toast.LENGTH_SHORT).show();
                     break;

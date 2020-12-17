@@ -1,13 +1,12 @@
 package com.mithrilmania.blocktopograph.chunk;
 
+import androidx.annotation.NonNull;
+
 import com.mithrilmania.blocktopograph.Log;
 import com.mithrilmania.blocktopograph.WorldData;
-import com.mithrilmania.blocktopograph.map.Block;
+import com.mithrilmania.blocktopograph.block.Block;
+import com.mithrilmania.blocktopograph.block.KnownBlockRepr;
 import com.mithrilmania.blocktopograph.map.Dimension;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
-
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -40,10 +39,33 @@ public abstract class Chunk {
         }
     }
 
-    public static Chunk create(@NotNull WorldData worldData, int chunkX, int chunkZ, Dimension dimension) {
+    public static Chunk createEmpty(@NonNull WorldData worldData, int chunkX, int chunkZ, Dimension dimension,
+                                    Version createOfVersion) {
+        Chunk chunk;
+        switch (createOfVersion) {
+            case V1_2_PLUS:
+                try {
+                    worldData.writeChunkData(chunkX, chunkZ, ChunkTag.GENERATOR_STAGE, dimension, (byte) 0, false, new byte[]{2, 0, 0, 0});
+                    worldData.writeChunkData(chunkX, chunkZ, ChunkTag.VERSION, dimension, (byte) 0, false, new byte[]{0xf});
+                    chunk = new BedrockChunk(worldData, createOfVersion, chunkX, chunkZ, dimension, true);
+                } catch (Exception e) {
+                    Log.d(Chunk.class, e);
+                    chunk = new VoidChunk(worldData, createOfVersion, chunkX, chunkZ, dimension);
+                }
+                break;
+            default:
+                chunk = new VoidChunk(worldData, createOfVersion, chunkX, chunkZ, dimension);
+        }
+        return chunk;
+    }
+
+    public static Chunk create(@NonNull WorldData worldData, int chunkX, int chunkZ, Dimension dimension,
+                               boolean createIfMissing, Version createOfVersion) {
         Version version;
         try {
             byte[] data = worldData.getChunkData(chunkX, chunkZ, ChunkTag.VERSION, dimension, (byte) 0, false);
+            if (data == null && createIfMissing)
+                return createEmpty(worldData, chunkX, chunkZ, dimension, createOfVersion);
             version = Version.getVersion(data);
         } catch (WorldData.WorldDBLoadException | WorldData.WorldDBException e) {
             Log.d(Chunk.class, e);
@@ -62,7 +84,7 @@ public abstract class Chunk {
             case V1_0:
             case V1_1:
             case V1_2_PLUS:
-                chunk = new BedrockChunk(worldData, version, chunkX, chunkZ, dimension);
+                chunk = new BedrockChunk(worldData, version, chunkX, chunkZ, dimension, false);
                 break;
             case NULL:
             default:
@@ -75,12 +97,12 @@ public abstract class Chunk {
         return mWorldData.get();
     }
 
-    @Contract(pure = true)
+
     public final boolean isVoid() {
         return mIsVoid;
     }
 
-    @Contract(pure = true)
+
     public final boolean isError() {
         return mIsError;
     }
@@ -99,16 +121,13 @@ public abstract class Chunk {
 
     abstract public int getGrassColor(int x, int z);
 
-    @NotNull
+    @NonNull
     abstract public Block getBlock(int x, int y, int z);
 
-    @NotNull
+    @NonNull
     abstract public Block getBlock(int x, int y, int z, int layer);
 
-    @NotNull
-    abstract public KnownBlock getKnownBlock(int x, int y, int z, int layer);
-
-    abstract public void setBlock(int x, int y, int z, int layer, @NotNull Block block);
+    abstract public void setBlock(int x, int y, int z, int layer, @NonNull Block block);
 
     abstract public int getBlockLightValue(int x, int y, int z);
 
@@ -119,6 +138,11 @@ public abstract class Chunk {
     abstract public int getCaveYUnderAt(int x, int z, int y);
 
     abstract public void save() throws WorldData.WorldDBException, IOException;
+
+    @NonNull
+    protected Block getAir() {
+        return mWorldData.get().mBlockRegistry.createBlock(KnownBlockRepr.B_0_0_AIR);
+    }
 
     public void deleteThis() throws Exception {
         WorldData worldData = mWorldData.get();
@@ -140,12 +164,12 @@ public abstract class Chunk {
         mIsError = true;
     }
 
-    @Contract(pure = true)
+
     public final NBTChunkData getEntity() {
         return mEntity;
     }
 
-    @Contract(pure = true)
+
     public final NBTChunkData getBlockEntity() {
         return mTileEntity;
     }

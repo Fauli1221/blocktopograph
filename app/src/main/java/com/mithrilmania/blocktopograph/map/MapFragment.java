@@ -44,6 +44,7 @@ import com.mithrilmania.blocktopograph.Log;
 import com.mithrilmania.blocktopograph.R;
 import com.mithrilmania.blocktopograph.World;
 import com.mithrilmania.blocktopograph.WorldActivityInterface;
+import com.mithrilmania.blocktopograph.block.KnownBlockRepr;
 import com.mithrilmania.blocktopograph.chunk.Chunk;
 import com.mithrilmania.blocktopograph.chunk.ChunkTag;
 import com.mithrilmania.blocktopograph.chunk.NBTChunkData;
@@ -69,8 +70,6 @@ import com.mithrilmania.blocktopograph.util.NamedBitmapProviderHandle;
 import com.mithrilmania.blocktopograph.util.math.DimensionVector3;
 import com.qozix.tileview.detail.DetailLevelManager;
 import com.qozix.tileview.markers.MarkerLayout;
-
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -165,10 +164,10 @@ public class MapFragment extends Fragment {
         FragmentActivity activity = getActivity();
         if (activity == null) return;
 
-        Toast toast = new Toast(activity);
-        toast.setView(getLayoutInflater().inflate(R.layout.toast_warn, (ViewGroup) activity.getWindow().getDecorView(), false));
-        toast.setDuration(Toast.LENGTH_LONG);
-        toast.show();
+//        Toast toast = new Toast(activity);
+//        toast.setView(getLayoutInflater().inflate(R.layout.toast_warn, (ViewGroup) activity.getWindow().getDecorView(), false));
+//        toast.setDuration(Toast.LENGTH_LONG);
+//        toast.show();
     }
 
     public void closeChunks() {
@@ -207,7 +206,7 @@ public class MapFragment extends Fragment {
 //                //byte[] arr = world.getWorldData().getChunkData(0, 0, ChunkTag.TERRAIN, Dimension.OVERWORLD, (byte) 0, true);
 //                //V1d2d13TerrainSubChunk subChunk = new V1d2d13TerrainSubChunk(ByteBuffer.wrap(arr));
 //                for (int z = 0; z < 16; z++)
-//                    chunk.setBlock(0, 6, z, 0, KnownBlock.B_5_0_PLANKS_OAK.getRuntimeId());
+//                    chunk.setBlock(0, 6, z, 0, KnownBlockRepr.B_5_0_PLANKS_OAK.getRuntimeId());
 //                chunk.save();//world.getWorldData(), 0, 0, Dimension.OVERWORLD, 1);
 //                Log.d(this, "ok");
 //            } catch (Exception e) {
@@ -298,7 +297,7 @@ public class MapFragment extends Fragment {
             if (mBinding.selectionBoard.hasSelection()) {
                 SelectionMenuFragment fragment = SelectionMenuFragment
                         .newInstance(mBinding.selectionBoard.getSelection(),
-                                this::doSelectionBasedEdit);
+                                world.getWorldData().mBlockRegistry, this::doSelectionBasedEdit);
                 trans.add(R.id.float_window_container, fragment);
                 mFloatingFragment = fragment;
                 setUpSelectionMenu();
@@ -317,7 +316,8 @@ public class MapFragment extends Fragment {
                 fragment = AdvancedLocatorFragment.create(world, this::frameTo);
             } else if (mFloatingFragment instanceof SelectionMenuFragment) {
                 fragment = SelectionMenuFragment
-                        .newInstance(mBinding.selectionBoard.getSelection(), this::doSelectionBasedEdit);
+                        .newInstance(mBinding.selectionBoard.getSelection(), world.getWorldData().mBlockRegistry,
+                                this::doSelectionBasedEdit);
             } else return;
             closeFloatPane();
             openFloatPane(fragment);
@@ -359,7 +359,7 @@ public class MapFragment extends Fragment {
      * @param fragment pane fragment to be attached.
      */
     @UiThread
-    private void openFloatPane(@NotNull FloatPaneFragment fragment) {
+    private void openFloatPane(@NonNull FloatPaneFragment fragment) {
         FragmentManager fm = getChildFragmentManager();
         fragment.setOnCloseButtonClickListener(this::closeFloatPane);
         FragmentTransaction trans = fm.beginTransaction();
@@ -389,7 +389,7 @@ public class MapFragment extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NotNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
         //TODO handle savedInstance...
 
@@ -476,7 +476,7 @@ public class MapFragment extends Fragment {
         }
 
         try {
-            KnownBlock.loadBitmaps(activity.getAssets());
+            KnownBlockRepr.loadBitmaps(activity.getAssets());
         } catch (IOException e) {
             Log.d(this, e);
         }
@@ -747,7 +747,7 @@ public class MapFragment extends Fragment {
         return newMarker;
     }
 
-    private void doSelectionBasedEdit(@NotNull EditFunction func, @Nullable Bundle args) {
+    private void doSelectionBasedEdit(@NonNull EditFunction func, @Nullable Bundle args) {
         WorldActivityInterface worldActivityInterface = worldProvider.get();
         FragmentActivity activity = getActivity();
         if (worldActivityInterface == null || activity == null) return;
@@ -756,7 +756,7 @@ public class MapFragment extends Fragment {
             case LAMPSHADE:
             case CHBIOME:
             case DCHUNK:
-                new SelectionBasedContextFreeEditTask(func, args, this).execute(
+                new SelectionBasedContextFreeEditTask(func, args, this, world.getWorldData().mBlockRegistry).execute(
                         new RectEditTarget(
                                 world.getWorldData(),
                                 mBinding.selectionBoard.getSelection(),
@@ -824,6 +824,8 @@ public class MapFragment extends Fragment {
 
         Activity act = getActivity();
         if (act == null) return;
+
+        TileEntity.loadIcons(act.getAssets());
 
         for (AbstractMarker abstractMarker : proceduralMarkers) {
             if (abstractMarker.equals(marker)) {
@@ -920,7 +922,7 @@ public class MapFragment extends Fragment {
      *
      * @param event long press event.
      */
-    private void onLongPressed(@NotNull MotionEvent event) {
+    private void onLongPressed(@NonNull MotionEvent event) {
         Dimension dimension = worldProvider.get().getDimension();
 
         // 1 chunk per tile on scale 1.0
@@ -1002,7 +1004,7 @@ public class MapFragment extends Fragment {
         } else {
             mBinding.selectionBoard.beginSelection(worldX, worldZ);
             SelectionMenuFragment fragment = SelectionMenuFragment
-                    .newInstance(mBinding.selectionBoard.getSelection(), this::doSelectionBasedEdit);
+                    .newInstance(mBinding.selectionBoard.getSelection(), world.getWorldData().mBlockRegistry, this::doSelectionBasedEdit);
             openFloatPane(fragment);
             setUpSelectionMenu();
             Activity activity = getActivity();
@@ -1015,8 +1017,15 @@ public class MapFragment extends Fragment {
     }
 
     private void onChooseEditEntitiesOrTileEntities(Dimension dim, int chunkXint, int chunkZint, View container, boolean isEntity) {
-        final Chunk chunk = world.getWorldData()
-                .getChunk(chunkXint, chunkZint, dim);
+        final Chunk chunk;
+        try {
+            chunk = world.getWorldData()
+                    .getChunk(chunkXint, chunkZint, dim);
+        } catch (Exception e) {
+            Log.d(this, e);
+            Toast.makeText(getContext(), R.string.error_could_not_open_world, Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         if (!chunkDataNBT(chunk, isEntity)) {
             Snackbar.make(container, String.format(getString(R.string.failed_to_load_x),

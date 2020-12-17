@@ -21,22 +21,6 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
-import com.mithrilmania.blocktopograph.CreateWorldActivity;
-import com.mithrilmania.blocktopograph.Log;
-import com.mithrilmania.blocktopograph.R;
-import com.mithrilmania.blocktopograph.World;
-import com.mithrilmania.blocktopograph.util.IoUtil;
-
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FilenameFilter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -44,6 +28,23 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
+import com.mithrilmania.blocktopograph.CreateWorldActivity;
+import com.mithrilmania.blocktopograph.Log;
+import com.mithrilmania.blocktopograph.R;
+import com.mithrilmania.blocktopograph.World;
+import com.mithrilmania.blocktopograph.backup.WorldBackups;
+import com.mithrilmania.blocktopograph.util.IoUtil;
+
+import org.apache.commons.io.FileUtils;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 public class WorldItemListActivity extends AppCompatActivity {
 
@@ -69,9 +70,16 @@ public class WorldItemListActivity extends AppCompatActivity {
      */
     public static boolean verifyStoragePermissions(Activity activity) {
         // Check if we have write permission
-        int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        boolean hasPermission = true;
+        for (String permission : PERMISSIONS_STORAGE) {
+            int state = ActivityCompat.checkSelfPermission(activity, permission);
+            if (state != PackageManager.PERMISSION_GRANTED) {
+                hasPermission = false;
+                break;
+            }
+        }
 
-        if (permission != PackageManager.PERMISSION_GRANTED) {
+        if (!hasPermission) {
             // We don't have permission so prompt the user
             ActivityCompat.requestPermissions(
                     activity,
@@ -174,14 +182,19 @@ public class WorldItemListActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
     }
 
+    private boolean checkPermissions(@NonNull int[] grantResults) {
+        for (int result : grantResults)
+            if (result != PackageManager.PERMISSION_GRANTED) return false;
+        return true;
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String permissions[], @NonNull int[] grantResults) {
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
         switch (requestCode) {
             case REQUEST_EXTERNAL_STORAGE: {
                 // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.length == PERMISSIONS_STORAGE.length && checkPermissions(grantResults)) {
 
                     // permission was granted, yay!
                     this.worldItemAdapter.enable();
@@ -286,7 +299,7 @@ public class WorldItemListActivity extends AppCompatActivity {
                         } else {
 
                             try {
-                                World world = new World(worldFolder, null);
+                                World world = new World(worldFolder, null, WorldItemListActivity.this);
 
                                 if (mTwoPane) {
                                     Bundle arguments = new Bundle();
@@ -420,33 +433,30 @@ public class WorldItemListActivity extends AppCompatActivity {
             saveFolders.add(new File(sd, "games/com.mojang/minecraftWorlds"));
             marks.add(null);
 
-            File[] datas = new File(sd, "Android/data").listFiles(new FilenameFilter() {
-                @Override
-                public boolean accept(File file, String s) {
-                    return s.startsWith("com.netease");
-                }
-            });
-
-            if (datas != null) for (File f : datas) {
-                File ff = new File(f, "files/minecraftWorlds");
-                if (ff.exists()) {
-                    saveFolders.add(ff);
-                    marks.add(getString(R.string.world_mark_neteas));
-                }
-            }
+            //noinspection ResultOfMethodCallIgnored
+            new File(sd, "Android/data").listFiles(
+                    file -> {
+                        if (file.getName().startsWith("com.netease")) {
+                            File worldsFolder = new File(file, "files/minecraftWorlds");
+                            if (worldsFolder.exists()) {
+                                saveFolders.add(worldsFolder);
+                                marks.add(getString(R.string.world_mark_neteas));
+                            }
+                        }
+                        return false;
+                    }
+            );
 
             for (int i = 0, saveFoldersSize = saveFolders.size(); i < saveFoldersSize; i++) {
                 File dir = saveFolders.get(i);
-                File[] files = dir.listFiles(new FileFilter() {
-                    @Override
-                    public boolean accept(File file) {
-                        if (!file.isDirectory()) return false;
-                        return new File(file, "level.dat").exists();
-                    }
+                File[] files = dir.listFiles(file -> {
+                    if (!file.isDirectory()) return false;
+                    return (new File(file, "level.dat").exists()
+                            || new File(file, WorldBackups.BTG_BACKUPS).exists());
                 });
                 if (files != null) for (File f : files) {
                     try {
-                        mWorlds.add(new World(f, marks.get(i)));
+                        mWorlds.add(new World(f, marks.get(i), WorldItemListActivity.this));
                     } catch (World.WorldLoadException e) {
                         Log.d(this, e);
                     }
@@ -496,7 +506,7 @@ public class WorldItemListActivity extends AppCompatActivity {
         public void onBindViewHolder(@NonNull final ViewHolder holder, int position) {
             holder.mWorld = mWorlds.get(position);
             holder.mWorldNameView.setText(holder.mWorld.getWorldDisplayName());
-            holder.mWorldSize.setText(IoUtil.getFileSizeInText(holder.mWorld.worldFolder));
+            holder.mWorldSize.setText(IoUtil.getFileSizeInText(FileUtils.sizeOf(holder.mWorld.worldFolder)));
             holder.mWorldGamemode.setText(WorldListUtil.getWorldGamemodeText(WorldItemListActivity.this, holder.mWorld));
             holder.mWorldLastPlayed.setText(WorldListUtil.getLastPlayedText(WorldItemListActivity.this, holder.mWorld));
             holder.mWorldPath.setText(holder.mWorld.worldFolder.getName());

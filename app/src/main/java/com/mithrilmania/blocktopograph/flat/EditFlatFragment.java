@@ -2,6 +2,7 @@ package com.mithrilmania.blocktopograph.flat;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -18,9 +19,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import com.google.android.material.snackbar.Snackbar;
 import com.mithrilmania.blocktopograph.Log;
 import com.mithrilmania.blocktopograph.R;
+import com.mithrilmania.blocktopograph.block.ListingBlock;
 import com.mithrilmania.blocktopograph.databinding.FragLayersBinding;
 import com.mithrilmania.blocktopograph.databinding.ItemWorldLayerBinding;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
 import com.mithrilmania.blocktopograph.util.UiUtil;
 import com.woxthebox.draglistview.DragItemAdapter;
 import com.woxthebox.draglistview.DragListView;
@@ -105,7 +106,7 @@ public final class EditFlatFragment extends Fragment {
             try {
                 Activity activity = thiz.get().getActivity();
                 if (activity == null) return null;
-                KnownBlock.loadBitmaps(activity.getAssets());
+                ListingBlock.B_1_STONE.getIcon(activity.getAssets());
             } catch (Exception e) {
                 Log.d(this, e);
             }
@@ -119,7 +120,7 @@ public final class EditFlatFragment extends Fragment {
             if (thiz == null) return;
             try {
                 DragListView listView = thiz.mBinding.list;
-                thiz.mMeowAdapter = thiz.new MeowAdapter();
+                thiz.mMeowAdapter = thiz.new MeowAdapter(thiz.getResources().getAssets());
                 listView.setLayoutManager(new LinearLayoutManager(thiz.getActivity()));
                 listView.setCanDragHorizontally(false);
                 listView.setAdapter(thiz.mMeowAdapter, false);
@@ -136,8 +137,12 @@ public final class EditFlatFragment extends Fragment {
 
     private class MeowAdapter extends DragItemAdapter<Layer, MeowAdapter.MeowHolder> implements ListSwipeHelper.OnSwipeListener {
 
-        MeowAdapter() {
+        @NonNull
+        private AssetManager assMan;
+
+        MeowAdapter(@NonNull AssetManager assMan) {
             setItemList(new LinkedList<>());
+            this.assMan = assMan;
         }
 
         @Override
@@ -148,13 +153,13 @@ public final class EditFlatFragment extends Fragment {
         }
 
         void loadDefault() {
-            Layer layer = new Layer(KnownBlock.B_7_0_BEDROCK, 1);
+            Layer layer = new Layer(ListingBlock.B_7_BEDROCK, 1);
             addItem(0, layer);
-            layer = new Layer(KnownBlock.B_3_0_DIRT, 29);
+            layer = new Layer(ListingBlock.B_3_DIRT, 29);
             addItem(0, layer);
-            layer = new Layer(KnownBlock.B_2_0_GRASS, 1);
+            layer = new Layer(ListingBlock.B_2_GRASS, 1);
             addItem(0, layer);
-            layer = new Layer(KnownBlock.B_31_2_TALLGRASS_GRASS, 1);
+            layer = new Layer(ListingBlock.B_31_TALLGRASS, 1);
             addItem(0, layer);
         }
 
@@ -200,7 +205,7 @@ public final class EditFlatFragment extends Fragment {
             super.onBindViewHolder(holder, position);
             Layer layer = mItemList.get(position);
             holder.binding.setLayer(layer);
-            holder.binding.icon.setImageBitmap(layer.block.bitmap);
+            holder.binding.icon.setImageBitmap(layer.block.getIcon(assMan));
         }
 
         @Override

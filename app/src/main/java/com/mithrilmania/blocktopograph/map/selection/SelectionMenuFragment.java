@@ -12,19 +12,6 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import com.mithrilmania.blocktopograph.Log;
-import com.mithrilmania.blocktopograph.R;
-import com.mithrilmania.blocktopograph.databinding.FragSelMenuBinding;
-import com.mithrilmania.blocktopograph.map.FloatPaneFragment;
-import com.mithrilmania.blocktopograph.map.edit.ChBiomeFragment;
-import com.mithrilmania.blocktopograph.map.edit.EditFunction;
-import com.mithrilmania.blocktopograph.map.edit.SearchAndReplaceFragment;
-import com.mithrilmania.blocktopograph.util.UiUtil;
-
-import org.jetbrains.annotations.NotNull;
-
-import java.lang.ref.WeakReference;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -32,12 +19,24 @@ import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 
+import com.mithrilmania.blocktopograph.Log;
+import com.mithrilmania.blocktopograph.R;
+import com.mithrilmania.blocktopograph.block.BlockRegistry;
+import com.mithrilmania.blocktopograph.databinding.FragSelMenuBinding;
+import com.mithrilmania.blocktopograph.map.FloatPaneFragment;
+import com.mithrilmania.blocktopograph.map.edit.ChBiomeFragment;
+import com.mithrilmania.blocktopograph.map.edit.EditFunction;
+import com.mithrilmania.blocktopograph.map.edit.SearchAndReplaceFragment;
+import com.mithrilmania.blocktopograph.util.UiUtil;
+
+import java.lang.ref.WeakReference;
+
 public class SelectionMenuFragment extends FloatPaneFragment {
 
     public static final String TAG_SNR = "Snr";
     public static final String TAG_CHBIOME = "Chbiome";
 
-    @NotNull
+    @NonNull
     private final Rect mSelection = new Rect();
     private FragSelMenuBinding mBinding;
     @Nullable
@@ -45,15 +44,18 @@ public class SelectionMenuFragment extends FloatPaneFragment {
 
     private EditFunctionEntry mEditFunctionEntry;
 
+    private BlockRegistry registry;
+
     public static SelectionMenuFragment newInstance(
-            @NotNull Rect initial, @NotNull EditFunctionEntry editFunctionEntry) {
+            @NonNull Rect initial, @NonNull BlockRegistry registry, @NonNull EditFunctionEntry editFunctionEntry) {
         SelectionMenuFragment fragment = new SelectionMenuFragment();
         fragment.mSelection.set(initial);
+        fragment.registry = registry;
         fragment.mEditFunctionEntry = editFunctionEntry;
         return fragment;
     }
 
-    private static boolean isSelectionChunkAligned(@NotNull Rect selection) {
+    private static boolean isSelectionChunkAligned(@NonNull Rect selection) {
         return (selection.left & 0xf) == 0 && (selection.right & 0xf) == 0
                 && (selection.top & 0xf) == 0 && (selection.bottom & 0xf) == 0;
     }
@@ -111,7 +113,7 @@ public class SelectionMenuFragment extends FloatPaneFragment {
         }
     }
 
-    private void onChooseLampshade(@NotNull View view) {
+    private void onChooseLampshade(@NonNull View view) {
         AlertDialog dialog = new AlertDialog.Builder(new ContextThemeWrapper(view.getContext(), R.style.AppTheme))
                 .setView(R.layout.dialog_lampshade)
                 .setTitle(R.string.map_edit_func_lampshade)
@@ -124,7 +126,7 @@ public class SelectionMenuFragment extends FloatPaneFragment {
     }
 
     private void onChooseSnr(View view) {
-        SearchAndReplaceFragment fragment = SearchAndReplaceFragment.newInstance(mEditFunctionEntry);
+        SearchAndReplaceFragment fragment = SearchAndReplaceFragment.newInstance(registry, mEditFunctionEntry);
         FragmentManager fragmentManager = getMeowFragmentManager();
         fragment.show(fragmentManager, TAG_SNR);
         Log.logFirebaseEvent(view.getContext(), Log.CustomFirebaseEvent.SNR_OPEN);
@@ -157,7 +159,7 @@ public class SelectionMenuFragment extends FloatPaneFragment {
         mEditFunctionEntry.invokeEditFunction(EditFunction.PICER, null);
     }
 
-    @NotNull
+    @NonNull
     private FragmentManager getMeowFragmentManager() {
         FragmentActivity activity = getActivity();
         FragmentManager fragmentManager = null;
@@ -185,7 +187,7 @@ public class SelectionMenuFragment extends FloatPaneFragment {
     }
 
     public interface EditFunctionEntry {
-        void invokeEditFunction(@NotNull EditFunction func, @Nullable Bundle args);
+        void invokeEditFunction(@NonNull EditFunction func, @Nullable Bundle args);
     }
 
     private class MeowWatcher implements TextWatcher {

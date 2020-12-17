@@ -1,21 +1,20 @@
 package com.mithrilmania.blocktopograph.map.edit;
 
-import com.mithrilmania.blocktopograph.chunk.Chunk;
-import com.mithrilmania.blocktopograph.map.Block;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
-import com.mithrilmania.blocktopograph.map.UnknownBlock;
+import androidx.annotation.NonNull;
 
-import org.jetbrains.annotations.NotNull;
+import com.mithrilmania.blocktopograph.block.Block;
+import com.mithrilmania.blocktopograph.chunk.Chunk;
+
 
 public class SnrEdit implements EditTarget.RandomAccessEdit {
 
     private SnrConfig config;
-    private KnownBlock b1;
-    private KnownBlock b2;
-    private KnownBlock b3;
-    private KnownBlock b4;
+    private SnrConfig.SearchConditionBlock b1;
+    private SnrConfig.SearchConditionBlock b2;
+    private Block b3;
+    private Block b4;
 
-    SnrEdit(@NotNull SnrConfig cfg) {
+    SnrEdit(@NonNull SnrConfig cfg) {
         config = cfg;
         switch (cfg.searchMode) {
             case 1:
@@ -40,41 +39,21 @@ public class SnrEdit implements EditTarget.RandomAccessEdit {
         }
     }
 
-    private static boolean equalsIgnoreSubtype(Block b1, Block b2) {
-        if (b1 instanceof UnknownBlock || b2 instanceof UnknownBlock)
-            return b1.equals(b2);
-        return ((KnownBlock) b1).id == ((KnownBlock) b2).id;
+    private boolean matches(Block got, SnrConfig.SearchConditionBlock expected) {
+        return got.getBlockType().equals(expected.identifier);
     }
 
     @Override
     public int edit(Chunk chunk, int x, int y, int z) {
         if (
-                (config.searchMode == 1 &&
-                        (config.ignoreSubId ?
-                                equalsIgnoreSubtype(chunk.getBlock(x, y, z, 1), b1)
-                                : (b1 == chunk.getBlock(x, y, z, 1))
-                        )
-                ) || (config.searchMode == 2 &&
-                        (config.ignoreSubId ?
-                                equalsIgnoreSubtype(chunk.getBlock(x, y, z), b1)
-                                : (b1 == chunk.getBlock(x, y, z))
-                        )
-                ) || (config.searchMode == 3 &&
-                        (config.ignoreSubId ?
-                                equalsIgnoreSubtype(chunk.getBlock(x, y, z), b1)
-                                        || equalsIgnoreSubtype(chunk.getBlock(x, y, z, 1), b1)
-                                : (
-                                (b1 == chunk.getBlock(x, y, z))
-                                        || (b1 == chunk.getBlock(x, y, z, 1)))
-                        )
-                ) || (config.searchMode == 4 &&
-                        (config.ignoreSubId ?
-                                (equalsIgnoreSubtype(chunk.getBlock(x, y, z), b1)
-                                        && equalsIgnoreSubtype(chunk.getBlock(x, y, z, 1), b2))
-                                : (
-                                (b1 == chunk.getBlock(x, y, z))
-                                        && (b2 == chunk.getBlock(x, y, z, 1)))
-                        )
+                (config.searchMode == 1 && matches(chunk.getBlock(x, y, z, 1), b1)
+                ) || (config.searchMode == 2 && matches(chunk.getBlock(x, y, z), b1)
+                ) || (config.searchMode == 3 && (
+                        matches(chunk.getBlock(x, y, z), b1)
+                                || matches(chunk.getBlock(x, y, z, 1), b1))
+                ) || (config.searchMode == 4 && (
+                        matches(chunk.getBlock(x, y, z), b1)
+                                && matches(chunk.getBlock(x, y, z, 1), b2))
                 )
         ) {
             switch (config.placeMode) {

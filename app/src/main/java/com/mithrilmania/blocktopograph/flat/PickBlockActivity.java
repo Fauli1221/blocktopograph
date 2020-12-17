@@ -1,6 +1,7 @@
 package com.mithrilmania.blocktopograph.flat;
 
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.Editable;
@@ -8,22 +9,22 @@ import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.mithrilmania.blocktopograph.R;
-import com.mithrilmania.blocktopograph.databinding.DialogPickBlockBinding;
-import com.mithrilmania.blocktopograph.databinding.ItemPickBlockBinding;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
-import com.mithrilmania.blocktopograph.util.UiUtil;
-
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.List;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.mithrilmania.blocktopograph.R;
+import com.mithrilmania.blocktopograph.block.ListingBlock;
+import com.mithrilmania.blocktopograph.databinding.DialogPickBlockBinding;
+import com.mithrilmania.blocktopograph.databinding.ItemPickBlockBinding;
+import com.mithrilmania.blocktopograph.util.UiUtil;
+
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class PickBlockActivity extends AppCompatActivity {
 
@@ -40,7 +41,7 @@ public final class PickBlockActivity extends AppCompatActivity {
         RecyclerView list = mBinding.list;
         mListManager = new LinearLayoutManager(this);
         list.setLayoutManager(mListManager);
-        mAdapter = new MeowAdapter();
+        mAdapter = new MeowAdapter(getAssets());
         list.setAdapter(mAdapter);
         setResult(RESULT_CANCELED);
 
@@ -88,12 +89,12 @@ public final class PickBlockActivity extends AppCompatActivity {
         protected Void doInBackground(Void... voids) {
             PickBlockActivity activity = thiz.get();
             if (activity == null) return null;
-            List<KnownBlock> list = activity.mAdapter.getListControl();
+            List<ListingBlock> list = activity.mAdapter.getListControl();
 
             //Backup all candidates.
-            KnownBlock[] olds = null;
+            ListingBlock[] olds = null;
             if (index1 >= 0) {
-                olds = new KnownBlock[index2 - index1 + 1];
+                olds = new ListingBlock[index2 - index1 + 1];
                 for (int i = index1, limit = list.size(); i < olds.length && i < limit; i++) {
                     olds[i] = list.get(i);
                 }
@@ -109,13 +110,13 @@ public final class PickBlockActivity extends AppCompatActivity {
             } catch (NumberFormatException e) {
                 num = -1;
             }
-            for (KnownBlock b : KnownBlock.values())
-                if (b.id == num ||
-                        (b.str != null && b.str.contains(text)) ||
-                        (b.subName != null && b.subName.contains(text)))
+            for (ListingBlock b : ListingBlock.values())
+                if (b.getLegacy_id() == num ||
+                        (b.getIdentifier().contains(text)) ||
+                        (b.getName().contains(text)))
                     list.add(b);
             int position = -1;
-            if (olds != null) for (KnownBlock b : olds) {
+            if (olds != null) for (ListingBlock b : olds) {
                 int i = list.indexOf(b);
                 if (i != -1) {
                     position = i;
@@ -137,10 +138,14 @@ public final class PickBlockActivity extends AppCompatActivity {
 
     private class MeowAdapter extends RecyclerView.Adapter<MeowAdapter.MeowHolder> {
 
-        private final List<KnownBlock> mBlocks;
+        private final List<ListingBlock> mBlocks;
 
-        private MeowAdapter() {
-            mBlocks = new ArrayList<>(4096);
+        @NonNull
+        private AssetManager assMan;
+
+        private MeowAdapter(@NonNull AssetManager assMan) {
+            mBlocks = new ArrayList<>(512);
+            this.assMan = assMan;
         }
 
         @NonNull
@@ -154,7 +159,7 @@ public final class PickBlockActivity extends AppCompatActivity {
             root.setOnClickListener(v -> {
                 //UiUtil.toast(PickBlockActivity.this,""+i);
                 setResult(RESULT_OK, new Intent()
-                        .putExtra(EXTRA_KEY_BLOCK, holder.binding.getBlock()));//;(KnownBlock) v.getTag()));
+                        .putExtra(EXTRA_KEY_BLOCK, holder.binding.getBlock()));//;(KnownBlockRepr) v.getTag()));
                 finish();
             });
             return holder;
@@ -162,11 +167,11 @@ public final class PickBlockActivity extends AppCompatActivity {
 
         @Override
         public void onBindViewHolder(@NonNull MeowHolder meowHolder, int i) {
-            KnownBlock block = mBlocks.get(i);
+            ListingBlock block = mBlocks.get(i);
             ItemPickBlockBinding binding = meowHolder.binding;
             binding.setBlock(block);
             //binding.getRoot().setTag(block);
-            binding.icon.setImageBitmap(block.getBitmap());
+            binding.icon.setImageBitmap(block.getIcon(assMan));
             UiUtil.blendBlockColor(binding.getRoot(), block);
         }
 
@@ -175,7 +180,7 @@ public final class PickBlockActivity extends AppCompatActivity {
             return mBlocks.size();
         }
 
-        List<KnownBlock> getListControl() {
+        List<ListingBlock> getListControl() {
             return mBlocks;
         }
 

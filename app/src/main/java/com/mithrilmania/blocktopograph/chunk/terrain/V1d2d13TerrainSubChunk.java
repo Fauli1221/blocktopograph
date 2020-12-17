@@ -3,19 +3,19 @@ package com.mithrilmania.blocktopograph.chunk.terrain;
 import androidx.annotation.NonNull;
 
 import com.mithrilmania.blocktopograph.WorldData;
+import com.mithrilmania.blocktopograph.block.Block;
+import com.mithrilmania.blocktopograph.block.BlockRegistry;
+import com.mithrilmania.blocktopograph.block.KnownBlockRepr;
 import com.mithrilmania.blocktopograph.chunk.ChunkTag;
-import com.mithrilmania.blocktopograph.map.Block;
 import com.mithrilmania.blocktopograph.map.Dimension;
-import com.mithrilmania.blocktopograph.map.KnownBlock;
 import com.mithrilmania.blocktopograph.nbt.convert.NBTInputStream;
 import com.mithrilmania.blocktopograph.nbt.convert.NBTOutputStream;
 import com.mithrilmania.blocktopograph.nbt.tags.CompoundTag;
+import com.mithrilmania.blocktopograph.nbt.tags.IntTag;
 import com.mithrilmania.blocktopograph.nbt.tags.ShortTag;
 import com.mithrilmania.blocktopograph.nbt.tags.StringTag;
 import com.mithrilmania.blocktopograph.nbt.tags.Tag;
 import com.mithrilmania.blocktopograph.util.LittleEndianOutputStream;
-
-import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -42,8 +42,14 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
     // There could be multiple BlockStorage let's read the first two.
     private volatile BlockStorage[] mStorages;
 
-    V1d2d13TerrainSubChunk(@NotNull ByteBuffer raw, @NotNull WorldData.BlockRegistry blockRegistry) {
+    V1d2d13TerrainSubChunk(@NonNull BlockRegistry blockRegistry) {
+        super(blockRegistry);
+        mStorages = new BlockStorage[2];
+        mIsDualStorageSupported = false;
+        createEmptyBlockStorage(0);
+    }
 
+    V1d2d13TerrainSubChunk(@NonNull ByteBuffer raw, @NonNull BlockRegistry blockRegistry) {
         super(blockRegistry);
 
         raw.order(ByteOrder.LITTLE_ENDIAN);
@@ -88,20 +94,20 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
     }
 
     @NonNull
-    private static BlockStorage.BlockRecord createNewBlockRecordOfNameValFormat(@NonNull Block block) {
+    private static BlockStorage.BlockRecord createNewBlockRecord(@NonNull Block block) {
         BlockStorage.BlockRecord blockRecord = new BlockStorage.BlockRecord();
         blockRecord.blockResolved = block;
-        StringTag nameTag = new StringTag(PALETTE_KEY_NAME, PREFIX_MINECRAFT + block.getName());
-        ShortTag valTag = new ShortTag(PALETTE_KEY_VAL, (short) block.getVal());
+        StringTag nameTag = new StringTag(PALETTE_KEY_NAME, block.getBlockType());
         ArrayList<Tag> pitem = new ArrayList<>(2);
         pitem.add(nameTag);
-        pitem.add(valTag);
+        pitem.add(block.getStates());
+        pitem.add(new IntTag("version", block.getVersion()));
         blockRecord.tag = new CompoundTag("", pitem);
         return blockRecord;
     }
 
     private boolean setBlockIfSpace(
-            int x, int y, int z, @NotNull BlockStorage storage, @NotNull Block block) {
+            int x, int y, int z, @NonNull BlockStorage storage, @NonNull Block block) {
         int code = -1;
 
         // If in palette.
@@ -121,10 +127,10 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
             int size = palette.size();
             if (size >= max) return false;
 
-            WorldData.BlockRegistry blockRegistry = getBlockRegistry();
+            BlockRegistry blockRegistry = getBlockRegistry();
             if (blockRegistry == null) return true;
 
-            palette.add(createNewBlockRecordOfNameValFormat(block));
+            palette.add(createNewBlockRecord(block));
             code = size;
         }
 
@@ -145,7 +151,7 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
         return true;
     }
 
-    private void writeStorage(@NotNull BlockStorage storage, @NotNull LittleEndianOutputStream stream) throws IOException {
+    private void writeStorage(@NonNull BlockStorage storage, @NonNull LittleEndianOutputStream stream) throws IOException {
 
         // Code length.
         stream.write(storage.blockCodeLenth << 1);
@@ -161,13 +167,39 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
         // Palettes.
         NBTOutputStream nos = new NBTOutputStream(stream, false, true);
 
-        WorldData.BlockRegistry blockRegistry = getBlockRegistry();
+        BlockRegistry blockRegistry = getBlockRegistry();
         if (blockRegistry == null) return;
         for (int j = 0; j < size; j++)
             nos.writeTag(palette.get(j).tag);
     }
 
-    private void loadBlockStorage(@NotNull ByteBuffer raw, int which) throws IOException {
+//    public CompoundTag[] tempGetPalettes(int baseX, int y, int z) {
+//        return new CompoundTag[]{
+//                tempGetPaletteItemOfPosition(baseX, y, z),
+//                tempGetPaletteItemOfPosition(baseX + 8, y, z)
+//        };
+//    }
+//
+//    private CompoundTag tempGetPaletteItemOfPosition(int x, int y, int z) {
+//        BlockStorage storage = mStorages[0];
+//
+//        //The codeOffset'th BlockState is wanted.
+//        int codeOffset = getOffset(x, y, z);
+//
+//        //How much BlockStates can one int32 hold?
+//        int intCapa = 32 / storage.blockCodeLenth;
+//
+//        //The int32 that holds the wanted BlockState.
+//        int stick = storage.records.get(codeOffset / intCapa);
+//
+//        //Get the BlockState. It's also the index in palette array.
+//        int ind = (stick >> (codeOffset % intCapa * storage.blockCodeLenth)) & msk[storage.blockCodeLenth - 1];
+//
+//        //Transform the local BlockState into global id<<8|data structure.
+//        return storage.palette.get(ind).tag;
+//    }
+
+    private void loadBlockStorage(@NonNull ByteBuffer raw, int which) throws IOException {
 
         BlockStorage storage = new BlockStorage();
         mStorages[which] = storage;
@@ -209,7 +241,7 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
 
         //Wrap it.
         NBTInputStream nis = new NBTInputStream(bais, false);
-        WorldData.BlockRegistry blockRegistry = getBlockRegistry();
+        BlockRegistry blockRegistry = getBlockRegistry();
         if (blockRegistry == null) return;
         for (int i = 0; i < psize; i++) {
 
@@ -220,9 +252,18 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
 
             //Read `name` and `val` then resolve the `name` into numeric id.
             String name = ((StringTag) tag.getChildTagByKey(PALETTE_KEY_NAME)).getValue();
-            Tag valTag = tag.getChildTagByKey(PALETTE_KEY_VAL);
-            record.blockResolved = blockRegistry.resolveBlock(name,
-                    valTag instanceof ShortTag ? ((ShortTag) valTag).getValue() : 0);
+            Tag statesTag = tag.getChildTagByKey("states");
+            if (statesTag != null) {
+                Tag verTag = tag.getChildTagByKey("version");
+                record.blockResolved = blockRegistry.createBlock(name, (CompoundTag) statesTag,
+                        verTag == null ? 2 : ((IntTag) verTag).getValue());
+            } else {
+                Tag valTag = tag.getChildTagByKey(PALETTE_KEY_VAL);
+                KnownBlockRepr repr = KnownBlockRepr.getBlockNew(name,
+                        valTag instanceof ShortTag ? ((ShortTag) valTag).getValue() : 0);
+                if (repr == null) repr = KnownBlockRepr.guessBlockNew(name);
+                record.blockResolved = blockRegistry.createBlock(repr);
+            }
             storage.palette.add(record);
         }
 
@@ -230,14 +271,14 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
         raw.position(raw.position() + nis.getReadCount());
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Block getBlock(int x, int y, int z, int layer) {
 
-        if (mIsError) return KnownBlock.B_0_0_AIR;
+        if (mIsError) return getAir();
 
         BlockStorage storage = mStorages[layer];
-        if (storage == null) return KnownBlock.B_0_0_AIR;
+        if (storage == null) return getAir();
 
         //The codeOffset'th BlockState is wanted.
         int codeOffset = getOffset(x, y, z);
@@ -256,14 +297,14 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
     }
 
     @Override
-    public void setBlock(int x, int y, int z, int layer, @NotNull Block block) {
+    public void setBlock(int x, int y, int z, int layer, @NonNull Block block) {
 
         // Has error or not supported.
         if (mIsError || (layer > 0 && !mIsDualStorageSupported)) return;
 
         BlockStorage storage = mStorages[layer];
         // Main storage won't be null unless error.
-        if (storage == null) storage = createSubBlockStorage();
+        if (storage == null) storage = createEmptyBlockStorage(1);
 
         // If space is enough.
         if (setBlockIfSpace(x, y, z, storage, block)) return;
@@ -311,10 +352,10 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
         return 0;
     }
 
-    private BlockStorage createSubBlockStorage() {
+    private BlockStorage createEmptyBlockStorage(int which) {
 
         BlockStorage storage = new BlockStorage();
-        mStorages[1] = storage;
+        mStorages[which] = storage;
 
         byte[] arr = new byte[512];
         ByteBuffer bbuff = ByteBuffer.wrap(arr);
@@ -323,7 +364,7 @@ public final class V1d2d13TerrainSubChunk extends TerrainSubChunk {
         storage.raw = arr;
 
         storage.palette = new ArrayList<>(4);
-        storage.palette.add(createNewBlockRecordOfNameValFormat(KnownBlock.B_0_0_AIR));
+        storage.palette.add(createNewBlockRecord(getAir()));
 
         storage.blockCodeLenth = 1;
 
